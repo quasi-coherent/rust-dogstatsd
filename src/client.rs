@@ -89,8 +89,8 @@ impl Client {
     ///
     /// This modifies a counter with an effective sampling
     /// rate of 1.0.
-    pub fn incr(&self, metric: &str) {
-        self.count(metric, 1.0);
+    pub fn incr(&self, metric: &str, tags: Option<Vec<&str>>) {
+        self.count(metric, 1.0, tags);
     }
 
     /// Decrement a metric by -1
@@ -102,8 +102,8 @@ impl Client {
     ///
     /// This modifies a counter with an effective sampling
     /// rate of 1.0.
-    pub fn decr(&self, metric: &str) {
-        self.count(metric, -1.0);
+    pub fn decr(&self, metric: &str, tags: Option<Vec<&str>>) {
+        self.count(metric, -1.0, tags);
     }
 
     /// Modify a counter by `value`.
@@ -115,8 +115,8 @@ impl Client {
     /// // Increment by 12
     /// client.count("metric.completed", 12.0);
     /// ```
-    pub fn count(&self, metric: &str, value: f64) {
-        let data = self.prepare(format!("{}:{}|c", metric, value));
+    pub fn count(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+        let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
         self.send(data);
     }
 
@@ -130,11 +130,11 @@ impl Client {
     /// // Increment by 4 50% of the time.
     /// client.sampled_count("metric.completed", 4, 0.5);
     /// ```
-    pub fn sampled_count(&self, metric: &str, value: f64, rate: f64) {
+    pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: Option<Vec<&str>>) {
         if rand::random::<f64>() < rate {
             return;
         }
-        let data = self.prepare(format!("{}:{}|c", metric, value));
+        let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
         self.send(data);
     }
 
@@ -144,8 +144,8 @@ impl Client {
     /// // set a gauge to 9001
     /// client.gauge("power_level.observed", 9001.0);
     /// ```
-    pub fn gauge(&self, metric: &str, value: f64) {
-        let data = self.prepare(format!("{}:{}|g", metric, value));
+    pub fn gauge(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+        let data = self.prepare_with_tags(format!("{}:{}|g", metric, value), tags);
         self.send(data);
     }
 
@@ -157,8 +157,8 @@ impl Client {
     /// // pass a duration value
     /// client.timer("response.duration", 10.123);
     /// ```
-    pub fn timer(&self, metric: &str, value: f64) {
-        let data = self.prepare(format!("{}:{}|ms", metric, value));
+    pub fn timer(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+        let data = self.prepare_with_tags(format!("{}:{}|ms", metric, value), tags);
         self.send(data);
     }
 
@@ -173,14 +173,14 @@ impl Client {
     ///   // Your code here.
     /// });
     /// ```
-    pub fn time<F, R>(&self, metric: &str, callable: F) -> R
+    pub fn time<F, R>(&self, metric: &str, tags: Option<Vec<&str>>, callable: F) -> R
     where
         F: FnOnce() -> R,
     {
         let start = time::Instant::now();
         let return_val = callable();
         let used = start.elapsed();
-        let data = self.prepare(format!("{}:{}|ms", metric, used.as_millis()));
+        let data = self.prepare_with_tags(format!("{}:{}|ms", metric, used.as_millis()), tags);
         self.send(data);
         return_val
     }
@@ -467,7 +467,7 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp").unwrap();
 
-        client.gauge("metric", 9.1);
+        client.gauge("metric", 9.1, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:9.1|g", response);
@@ -479,7 +479,7 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "").unwrap();
 
-        client.gauge("metric", 9.1);
+        client.gauge("metric", 9.1, None);
 
         let response = server_recv(server);
         assert_eq!("metric:9.1|g", response);
@@ -491,7 +491,7 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp").unwrap();
 
-        client.incr("metric");
+        client.incr("metric", None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:1|c", response);
@@ -503,7 +503,7 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp").unwrap();
 
-        client.decr("metric");
+        client.decr("metric", None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:-1|c", response);
@@ -515,7 +515,7 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp").unwrap();
 
-        client.count("metric", 12.2);
+        client.count("metric", 12.2, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:12.2|c", response);
@@ -527,7 +527,7 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp").unwrap();
 
-        client.timer("metric", 21.39);
+        client.timer("metric", 21.39, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:21.39|ms", response);
@@ -543,7 +543,7 @@ mod test {
         };
 
         let mut t = TimeTest { num: 10 };
-        let output = client.time("time_block", || {
+        let output = client.time("time_block", None, || {
             t.num += 2;
             "a string"
         });
@@ -669,7 +669,7 @@ mod test {
 
         // Should still be able to send metrics
         // with the client.
-        client.count("customers", 6.0);
+        client.count("customers", 6.0, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.load:9|g\nmyapp.customers:7|c", response);
