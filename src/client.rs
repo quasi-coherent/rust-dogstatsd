@@ -193,6 +193,14 @@ impl Client {
         }
     }
 
+    fn prepare_with_tags<T: AsRef<str>>(&self, data: T, tags: Option<Vec<&str>>) -> String {
+        let d = self.prepare(data);
+        match tags {
+            Some(t) => format!("{}|#{}", d, t.join(",")),
+            None => d
+        }
+    }
+
     /// Send data along the UDP socket.
     fn send(&self, data: String) {
         let _ = self.socket.send_to(data.as_bytes(), self.server_address);
@@ -217,8 +225,8 @@ impl Client {
     /// // pass response size value
     /// client.histogram("response.size", 128.0);
     /// ```
-    pub fn histogram(&self, metric: &str, value: f64) {
-        let data = self.prepare(format!("{}:{}|h", metric, value));
+    pub fn histogram(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+        let data = self.prepare_with_tags(format!("{}:{}|h", metric, value), tags);
         self.send(data);
     }
 }
@@ -553,10 +561,22 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp").unwrap();
 
-        client.histogram("metric", 9.1);
+        client.histogram("metric", 9.1, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:9.1|h", response);
+    }
+
+    #[test]
+    fn test_sending_histogram_with_tags() {
+        let host = next_test_ip4();
+        let server = make_server(&host);
+        let client = Client::new(&host, "myapp").unwrap();
+
+        client.histogram("metric", 9.1, Some(vec!["tag1", "tag2:test"]));
+
+        let response = server_recv(server);
+        assert_eq!("myapp.metric:9.1|h|#tag1,tag2:test", response);
     }
 
     #[test]
