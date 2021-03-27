@@ -2,7 +2,7 @@
 extern crate statsd;
 
 // Import the client object.
-use statsd::client::Client;
+use statsd::client::{Client, AlertType, ServiceCheckStatus};
 
 fn main() {
     let client = Client::new("127.0.0.1:8125", "myapp").unwrap();
@@ -20,4 +20,10 @@ fn main() {
     client.time("closure.duration", tags, || {
         println!("Timing a closure");
     });
+
+    client.event("event title", "event text", AlertType::Warning, tags);
+    println!("Sent a event!");
+
+    client.service_check("service.check.name", ServiceCheckStatus::Critical, tags);
+    println!("Sent a service_check!");
 }

@@ -247,6 +247,16 @@ impl Client {
         self.send(event_with_tags)
     }
 
+    // todo SC info
+    pub fn service_check(&self, service_check_name: &str, status: ServiceCheckStatus, tags: &Option<Vec<&str>>){
+        let mut d = vec![];
+        let status_code = (status as u32).to_string();
+        d.push("_sc");
+        d.push(service_check_name);
+        d.push(&status_code);
+        let sc_with_tags = self.append_tags(d.join("|"), tags);
+        self.send(sc_with_tags)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -261,6 +271,14 @@ impl fmt::Display for AlertType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ServiceCheckStatus {
+    Ok = 0,
+    Warning = 1,
+    Critical = 2,
+    Unknown = 3,
 }
 
 pub struct Pipeline {
@@ -621,6 +639,18 @@ mod test {
 
         let response = server_recv(server);
         assert_eq!("_e{10,8}:Title Test|Text ABC|t:error|#tag1,tag2:test", response);
+    }
+
+    #[test]
+    fn test_sending_service_check_with_tags() {
+        let host = next_test_ip4();
+        let server = make_server(&host);
+        let client = Client::new(&host, "myapp").unwrap();
+
+        client.service_check("Service.check.name", ServiceCheckStatus::Critical,  &Some(vec!["tag1", "tag2:test"]));
+
+        let response = server_recv(server);
+        assert_eq!("_sc|Service.check.name|2|#tag1,tag2:test", response);
     }
 
     #[test]
