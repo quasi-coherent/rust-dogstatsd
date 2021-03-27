@@ -5,7 +5,7 @@ extern crate statsd;
 use statsd::client::{Client, AlertType, ServiceCheckStatus};
 
 fn main() {
-    let client = Client::new("127.0.0.1:8125", "myapp").unwrap();
+    let client = Client::new("127.0.0.1:8125", "myapp", Some(vec!["common1", "common2:test"])).unwrap();
     let tags = &Some(vec!["tag1", "tag2:test"]);
 
     client.incr("some.counter", tags);
