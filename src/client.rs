@@ -56,7 +56,7 @@ pub struct Client {
     socket: UdpSocket,
     server_address: SocketAddr,
     prefix: String,
-    common_tags: Vec<String>,
+    constant_tags: Vec<String>,
 }
 
 impl Client {
@@ -64,7 +64,7 @@ impl Client {
     pub fn new<T: ToSocketAddrs>(
         host: T,
         prefix: &str,
-        common_tags: Option<Vec<&str>>,
+        constant_tags: Option<Vec<&str>>,
     ) -> Result<Client, StatsdError> {
         let server_address = host
             .to_socket_addrs()?
@@ -82,7 +82,7 @@ impl Client {
             socket,
             prefix: prefix.to_string(),
             server_address,
-            common_tags: match common_tags {
+            constant_tags: match constant_tags {
                 Some(tags) => tags.iter().map(|x| x.to_string()).collect(),
                 None => vec![],
             },
@@ -207,10 +207,10 @@ impl Client {
     }
 
     fn append_tags<T: AsRef<str>>(&self, data: T, tags: &Option<Vec<&str>>) -> String {
-        if self.common_tags.is_empty() && tags.is_none() {
+        if self.constant_tags.is_empty() && tags.is_none() {
             data.as_ref().to_string()
         } else {
-            let mut all_tags = self.common_tags.clone();
+            let mut all_tags = self.constant_tags.clone();
             match tags {
                 Some(v) => {
                     for tag in v {
@@ -656,7 +656,7 @@ mod test {
     }
 
     #[test]
-    fn test_sending_histogram_with_common_tags() {
+    fn test_sending_histogram_with_constant_tags() {
         let host = next_test_ip4();
         let server = make_server(&host);
         let client =
