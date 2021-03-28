@@ -56,12 +56,16 @@ pub struct Client {
     socket: UdpSocket,
     server_address: SocketAddr,
     prefix: String,
-    common_tags: Vec<String>
+    common_tags: Vec<String>,
 }
 
 impl Client {
     /// Construct a new statsd client given an host/port & prefix
-    pub fn new<T: ToSocketAddrs>(host: T, prefix: &str, common_tags: Option<Vec<&str>>) -> Result<Client, StatsdError> {
+    pub fn new<T: ToSocketAddrs>(
+        host: T,
+        prefix: &str,
+        common_tags: Option<Vec<&str>>,
+    ) -> Result<Client, StatsdError> {
         let server_address = host
             .to_socket_addrs()?
             .next()
@@ -80,8 +84,8 @@ impl Client {
             server_address,
             common_tags: match common_tags {
                 Some(tags) => tags.iter().map(|x| x.to_string()).collect(),
-                None => vec![]
-            }
+                None => vec![],
+            },
         })
     }
 
@@ -212,7 +216,7 @@ impl Client {
                     for tag in v {
                         all_tags.push(tag.to_string());
                     }
-                },
+                }
                 None => {
                     // nothing to do
                 }
@@ -256,7 +260,7 @@ impl Client {
     /// // pass a app start event
     /// client.event("MyApp Start", "MyApp Details", AlertType::Info, &Some(vec!["tag1", "tag2:test"]));
     /// ```
-    pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: &Option<Vec<&str>>){
+    pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: &Option<Vec<&str>>) {
         let mut d = vec![];
         d.push(format!("_e{{{},{}}}:{}", title.len(), text.len(), title));
         d.push(text.to_string());
@@ -273,7 +277,12 @@ impl Client {
     /// // pass a app status
     /// client.service_check("MyApp", ServiceCheckStatus::Ok, &Some(vec!["tag1", "tag2:test"]));
     /// ```
-    pub fn service_check(&self, service_check_name: &str, status: ServiceCheckStatus, tags: &Option<Vec<&str>>){
+    pub fn service_check(
+        &self,
+        service_check_name: &str,
+        status: ServiceCheckStatus,
+        tags: &Option<Vec<&str>>,
+    ) {
         let mut d = vec![];
         let status_code = (status as u32).to_string();
         d.push("_sc");
@@ -650,7 +659,8 @@ mod test {
     fn test_sending_histogram_with_common_tags() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", Some(vec!["tag1common", "tag2common:test"])).unwrap();
+        let client =
+            Client::new(&host, "myapp", Some(vec!["tag1common", "tag2common:test"])).unwrap();
 
         // without tags
         client.histogram("metric", 9.1, &None);
@@ -660,11 +670,17 @@ mod test {
         let tags = &Some(vec!["tag1", "tag2:test"]);
         client.histogram("metric", 9.1, tags);
         response = server_recv(server.try_clone().unwrap());
-        assert_eq!("myapp.metric:9.1|h|#tag1common,tag2common:test,tag1,tag2:test", response);
+        assert_eq!(
+            "myapp.metric:9.1|h|#tag1common,tag2common:test,tag1,tag2:test",
+            response
+        );
         // repeat
         client.histogram("metric", 19.12, tags);
         response = server_recv(server.try_clone().unwrap());
-        assert_eq!("myapp.metric:19.12|h|#tag1common,tag2common:test,tag1,tag2:test", response);
+        assert_eq!(
+            "myapp.metric:19.12|h|#tag1common,tag2common:test,tag1,tag2:test",
+            response
+        );
     }
 
     #[test]
@@ -673,10 +689,18 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp", None).unwrap();
 
-        client.event("Title Test", "Text ABC", AlertType::Error, &Some(vec!["tag1", "tag2:test"]));
+        client.event(
+            "Title Test",
+            "Text ABC",
+            AlertType::Error,
+            &Some(vec!["tag1", "tag2:test"]),
+        );
 
         let response = server_recv(server);
-        assert_eq!("_e{10,8}:Title Test|Text ABC|t:error|#tag1,tag2:test", response);
+        assert_eq!(
+            "_e{10,8}:Title Test|Text ABC|t:error|#tag1,tag2:test",
+            response
+        );
     }
 
     #[test]
@@ -685,7 +709,11 @@ mod test {
         let server = make_server(&host);
         let client = Client::new(&host, "myapp", None).unwrap();
 
-        client.service_check("Service.check.name", ServiceCheckStatus::Critical,  &Some(vec!["tag1", "tag2:test"]));
+        client.service_check(
+            "Service.check.name",
+            ServiceCheckStatus::Critical,
+            &Some(vec!["tag1", "tag2:test"]),
+        );
 
         let response = server_recv(server);
         assert_eq!("_sc|Service.check.name|2|#tag1,tag2:test", response);

@@ -2,10 +2,15 @@
 extern crate statsd;
 
 // Import the client object.
-use statsd::client::{Client, AlertType, ServiceCheckStatus};
+use statsd::client::{AlertType, Client, ServiceCheckStatus};
 
 fn main() {
-    let client = Client::new("127.0.0.1:8125", "myapp", Some(vec!["common1", "common2:test"])).unwrap();
+    let client = Client::new(
+        "127.0.0.1:8125",
+        "myapp",
+        Some(vec!["common1", "common2:test"]),
+    )
+    .unwrap();
     let tags = &Some(vec!["tag1", "tag2:test"]);
 
     client.incr("some.counter", tags);
