@@ -212,15 +212,15 @@ impl Client {
                     for tag in v {
                         all_tags.push(tag.to_string());
                     }
-                    // let mut test2 = v.into().map(|x| x.to_string()).collect();
-                    // all_tags.append(test2);
                 },
-                None => {}
+                None => {
+                    // nothing to do
+                }
             }
             format!("{}|#{}", data.as_ref(), all_tags.join(","))
         }
     }
-    
+
     /// Send data along the UDP socket.
     fn send(&self, data: String) {
         let _ = self.socket.send_to(data.as_bytes(), self.server_address);
@@ -250,8 +250,12 @@ impl Client {
         self.send(data);
     }
 
-    // todo event
-    // _e{title.length,text.length}:title|text|d:date_happened|h:hostname|p:priority|t:alert_type|#tag1,tag2
+    /// Send a event.
+    ///
+    /// ```ignore
+    /// // pass a app start event
+    /// client.event("MyApp Start", "MyApp Details", AlertType::Info, &Some(vec!["tag1", "tag2:test"]));
+    /// ```
     pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: &Option<Vec<&str>>){
         let mut d = vec![];
         d.push(format!("_e{{{},{}}}:{}", title.len(), text.len(), title));
@@ -263,7 +267,12 @@ impl Client {
         self.send(event_with_tags)
     }
 
-    // todo SC info
+    /// Send a service check.
+    ///
+    /// ```ignore
+    /// // pass a app status
+    /// client.service_check("MyApp", ServiceCheckStatus::Ok, &Some(vec!["tag1", "tag2:test"]));
+    /// ```
     pub fn service_check(&self, service_check_name: &str, status: ServiceCheckStatus, tags: &Option<Vec<&str>>){
         let mut d = vec![];
         let status_code = (status as u32).to_string();
