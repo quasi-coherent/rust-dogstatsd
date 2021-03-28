@@ -26,9 +26,12 @@ fn main() {
         println!("Timing a closure");
     });
 
+    client.histogram("some.histogram", 104.3, tags);
+    println!("Set a histogram!");
+
     client.event("event title", "event text", AlertType::Warning, tags);
     println!("Sent a event!");
 
-    client.service_check("service.check.name", ServiceCheckStatus::Critical, tags);
+    client.service_check("myapp.service.check.name", ServiceCheckStatus::Critical, tags);
     println!("Sent a service_check!");
 }
