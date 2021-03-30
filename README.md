@@ -1,6 +1,6 @@
 # Rust DogStatsd
 
-[![Build Status](https://secure.travis-ci.org/minato128/rust-dogstatsd.png?branch=master)](http://travis-ci.org/minato128/rust-dogstatsd)
+[![Build Status](https://travis-ci.org/minato128/rust-dogstatsd.svg?branch=master)](https://travis-ci.org/minato128/rust-dogstatsd)
 
 A DogStatsD client implementation of statsd in rust. 
 
