@@ -1,4 +1,4 @@
-//! A Rust implementation of statsd server & client.
+//! A Rust implementation of DogStatsD server & client.
 //!
 //! The statsd protocol consistents of plain-text single-packet messages sent
 //! over UDP, containing not much more than a key and (possibly sampled) value.
