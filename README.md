@@ -1,16 +1,18 @@
-# Rust Statsd
+# Rust DogStatsd
 
-[![Build Status](https://secure.travis-ci.org/markstory/rust-statsd.png?branch=master)](http://travis-ci.org/markstory/rust-statsd)
+[![Build Status](https://secure.travis-ci.org/minato128/rust-dogstatsd.png?branch=master)](http://travis-ci.org/minato128/rust-dogstatsd)
 
-A StatsD client implementation of statsd in rust.
+A DogStatsD client implementation of statsd in rust. 
+
+forked from https://github.com/markstory/rust-statsd
 
 ## Using the client library
 
-Add the `statsd` package as a dependency in your `Cargo.toml` file:
+Add the `datadog-statsd` package as a dependency in your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-statsd = "^0.13.1"
+datadog-statsd = "^0.1.0"
 ```
 
 You need rustc >= 1.8.0 for statsd to work.
@@ -19,10 +21,10 @@ You can then get a client instance and start tracking metrics:
 
 ```rust
 // Load the crate
-extern crate statsd;
+extern crate datadog_statsd;
 
 // Import the client object.
-use statsd::Client;
+use datadog_statsd::Client;
 
 // Get a client with the prefix of `myapp`. The host should be the
 // IP:port of your statsd daemon.

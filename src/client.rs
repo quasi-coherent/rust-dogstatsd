@@ -47,7 +47,7 @@ impl error::Error for StatsdError {}
 /// Creating a client and sending metrics is easy.
 ///
 /// ```ignore
-/// use statsd::client::Client;
+/// use datadog_statsd::client::Client;
 ///
 /// let client = Client::new("127.0.0.1:8125", "myapp");
 /// client.incr("some.metric.completed");
@@ -331,7 +331,7 @@ impl Pipeline {
     /// Set max UDP packet size
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// pipe.set_max_udp_size(128);
@@ -343,7 +343,7 @@ impl Pipeline {
     /// Increment a metric by 1
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // Increment a given metric by 1.
@@ -359,7 +359,7 @@ impl Pipeline {
     /// Decrement a metric by -1
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // Decrement a given metric by 1
@@ -378,7 +378,7 @@ impl Pipeline {
     /// a sampling rate of 1.0.
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // Increment by 12
@@ -395,7 +395,7 @@ impl Pipeline {
     /// a custom sampling rate.
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // Increment by 4 50% of the time.
@@ -412,7 +412,7 @@ impl Pipeline {
     /// Set a gauge value.
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // set a gauge to 9001
@@ -428,7 +428,7 @@ impl Pipeline {
     /// The value is expected to be in ms.
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // pass a duration value
@@ -445,7 +445,7 @@ impl Pipeline {
     /// duration will be sent as a metric.
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // pass a duration value
@@ -467,7 +467,7 @@ impl Pipeline {
     /// Send a histogram value.
     ///
     /// ```
-    /// use statsd::client::Pipeline;
+    /// use datadog_statsd::client::Pipeline;
     ///
     /// let mut pipe = Pipeline::new();
     /// // pass response size value

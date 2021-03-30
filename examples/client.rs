@@ -1,8 +1,8 @@
 // Load the crate
-extern crate statsd;
+extern crate datadog_statsd;
 
 // Import the client object.
-use statsd::client::{AlertType, Client, ServiceCheckStatus};
+use datadog_statsd::client::{AlertType, Client, ServiceCheckStatus};
 
 fn main() {
     let client = Client::new(
@@ -32,6 +32,10 @@ fn main() {
     client.event("event title", "event text", AlertType::Warning, tags);
     println!("Sent a event!");
 
-    client.service_check("myapp.service.check.name", ServiceCheckStatus::Critical, tags);
+    client.service_check(
+        "myapp.service.check.name",
+        ServiceCheckStatus::Critical,
+        tags,
+    );
     println!("Sent a service_check!");
 }
