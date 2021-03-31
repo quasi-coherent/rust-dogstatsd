@@ -2,8 +2,6 @@ language: rust
 
 rust:
   - stable
-  - beta
-  - nightly
 
 before_script: |
   cargo fmt --version
