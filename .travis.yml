@@ -12,5 +12,10 @@ before_script: |
   cargo clippy
   cargo clean
 
+deploy:
+  provider: cargo
+  token: $YOUR_API_TOKEN
+  on:
+    tags: true
 notifications:
     email: false
