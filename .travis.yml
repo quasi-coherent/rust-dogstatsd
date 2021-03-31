@@ -1,4 +1,16 @@
 language: rust
 
+rust:
+  - stable
+  - beta
+  - nightly
+
+before_script: |
+  cargo fmt --version
+  cargo fmt -- --check
+  cargo clippy --version
+  cargo clippy
+  cargo clean
+
 notifications:
     email: false
