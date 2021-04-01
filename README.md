@@ -74,6 +74,20 @@ client.time("operation.duration", tags, || {
 });
 ```
 
+### Events & ServiceChecks
+
+```rust
+// Send a datadog event.
+client.event("event title", "event text", AlertType::Warning, tags);
+
+// Send a datadog service check.
+client.service_check(
+    "myapp.service.check.name",
+    ServiceCheckStatus::Critical,
+    tags,
+);
+```
+
 ### Pipeline
 
 Multiple metrics can be sent to StatsD once using pipeline:
