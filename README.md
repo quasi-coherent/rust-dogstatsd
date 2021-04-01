@@ -4,7 +4,13 @@
 
 A DogStatsD client implementation of statsd in rust. 
 
-forked from https://github.com/markstory/rust-statsd
+- Forked from https://github.com/markstory/rust-statsd
+- Support Datadog Statsd extensions
+  - Events
+  - Service Checks
+  - Constant Tagging
+  - Tagging for a Specific Metric
+
 
 ## Using the client library
 
@@ -28,7 +34,7 @@ use datadog_statsd::Client;
 
 // Get a client with the prefix of `myapp`. The host should be the
 // IP:port of your statsd daemon.
-let client = Client::new("127.0.0.1:8125", "myapp").unwrap();
+let client = Client::new("127.0.0.1:8125", "myapp", Some(vec!["common1", "common2:test"]),).unwrap();
 ```
 
 ## Tracking Metrics
@@ -36,20 +42,22 @@ let client = Client::new("127.0.0.1:8125", "myapp").unwrap();
 Once you've created a client, you can track timers and metrics:
 
 ```rust
+let tags = &Some(vec!["tag1", "tag2:test"]);
+
 // Increment a counter by 1
-client.incr("some.counter");
+client.incr("some.counter", tags);
 
 // Decrement a counter by 1
-client.decr("some.counter");
+client.decr("some.counter", tags);
 
 // Update a gauge
-client.gauge("some.value", 12.0);
+client.gauge("some.value", 12.0, tags);
 
 // Modify a counter by an arbitrary float.
-client.count("some.counter", 511.0);
+client.count("some.counter", 511.0, tags);
 
 // Send a histogram value as a float.
-client.histogram("some.histogram", 511.0);
+client.histogram("some.histogram", 511.0, tags);
 ```
 
 ### Tracking Timers
@@ -58,10 +66,10 @@ Timers can be updated using `timer()` and `time()`:
 
 ```rust
 // Update a timer based on a calculation you've done.
-client.timer("operation.duration", 13.4);
+client.timer("operation.duration", 13.4, tags);
 
 // Time a closure
-client.time("operation.duration", || {
+client.time("operation.duration", tags, || {
 	// Do something expensive.
 });
 ```
