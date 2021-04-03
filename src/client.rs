@@ -140,10 +140,10 @@ impl Client {
     /// client.sampled_count("metric.completed", 4, 0.5);
     /// ```
     pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: &Option<Vec<&str>>) {
-        if rand::random::<f64>() < rate {
+        if rand::random::<f64>() >= rate {
             return;
         }
-        let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
+        let data = self.prepare_with_tags(format!("{}:{}|c|@{}", metric, value, rate), tags);
         self.send(data);
     }
 
@@ -402,10 +402,10 @@ impl Pipeline {
     /// pipe.sampled_count("metric.completed", 4.0, 0.5);
     /// ```
     pub fn sampled_count(&mut self, metric: &str, value: f64, rate: f64) {
-        if rand::random::<f64>() < rate {
+        if rand::random::<f64>() >= rate {
             return;
         }
-        let data = format!("{}:{}|c", metric, value);
+        let data = format!("{}:{}|c|@{}", metric, value, rate);
         self.stats.push_back(data);
     }
 
