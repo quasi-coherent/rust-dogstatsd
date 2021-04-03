@@ -49,7 +49,7 @@ impl error::Error for StatsdError {}
 /// ```ignore
 /// use datadog_statsd::client::Client;
 ///
-/// let client = Client::new("127.0.0.1:8125", "myapp");
+/// let client = Client::new("127.0.0.1:8125", "myapp", tags);
 /// client.incr("some.metric.completed");
 /// ```
 pub struct Client {
@@ -93,7 +93,7 @@ impl Client {
     ///
     /// ```ignore
     /// # Increment a given metric by 1.
-    /// client.incr("metric.completed");
+    /// client.incr("metric.completed", tags);
     /// ```
     ///
     /// This modifies a counter with an effective sampling
@@ -106,7 +106,7 @@ impl Client {
     ///
     /// ```ignore
     /// # Decrement a given metric by 1
-    /// client.decr("metric.completed");
+    /// client.decr("metric.completed", tags);
     /// ```
     ///
     /// This modifies a counter with an effective sampling
@@ -122,7 +122,7 @@ impl Client {
     ///
     /// ```ignore
     /// // Increment by 12
-    /// client.count("metric.completed", 12.0);
+    /// client.count("metric.completed", 12.0, tags);
     /// ```
     pub fn count(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
@@ -137,13 +137,13 @@ impl Client {
     ///
     /// ```ignore
     /// // Increment by 4 50% of the time.
-    /// client.sampled_count("metric.completed", 4, 0.5);
+    /// client.sampled_count("metric.completed", 4, 0.5, tags);
     /// ```
     pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: &Option<Vec<&str>>) {
-        if rand::random::<f64>() < rate {
+        if rand::random::<f64>() >= rate {
             return;
         }
-        let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
+        let data = self.prepare_with_tags(format!("{}:{}|c|@{}", metric, value, rate), tags);
         self.send(data);
     }
 
@@ -151,7 +151,7 @@ impl Client {
     ///
     /// ```ignore
     /// // set a gauge to 9001
-    /// client.gauge("power_level.observed", 9001.0);
+    /// client.gauge("power_level.observed", 9001.0, tags);
     /// ```
     pub fn gauge(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|g", metric, value), tags);
@@ -164,7 +164,7 @@ impl Client {
     ///
     /// ```ignore
     /// // pass a duration value
-    /// client.timer("response.duration", 10.123);
+    /// client.timer("response.duration", 10.123, tags);
     /// ```
     pub fn timer(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|ms", metric, value), tags);
@@ -178,7 +178,7 @@ impl Client {
     ///
     /// ```ignore
     /// // pass a duration value
-    /// client.time("response.duration", || {
+    /// client.time("response.duration", tags, || {
     ///   // Your code here.
     /// });
     /// ```
@@ -247,7 +247,7 @@ impl Client {
     ///
     /// ```ignore
     /// // pass response size value
-    /// client.histogram("response.size", 128.0);
+    /// client.histogram("response.size", 128.0, tags);
     /// ```
     pub fn histogram(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|h", metric, value), tags);
@@ -402,10 +402,10 @@ impl Pipeline {
     /// pipe.sampled_count("metric.completed", 4.0, 0.5);
     /// ```
     pub fn sampled_count(&mut self, metric: &str, value: f64, rate: f64) {
-        if rand::random::<f64>() < rate {
+        if rand::random::<f64>() >= rate {
             return;
         }
-        let data = format!("{}:{}|c", metric, value);
+        let data = format!("{}:{}|c|@{}", metric, value, rate);
         self.stats.push_back(data);
     }
 

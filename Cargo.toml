@@ -1,8 +1,10 @@
 [package]
 name = "datadog-statsd"
-version = "0.1.0"
+version = "0.1.1"
 description = "A dogstatsd client for rust."
 homepage = "https://github.com/minato128/rust-dogstatsd"
+repository = "https://github.com/minato128/rust-dogstatsd"
+documentation = "https://docs.rs/datadog-statsd/"
 readme = "README.md"
 license = "MIT"
 authors = ["Mark Story <mark@mark-story.com>"]
@@ -12,7 +14,7 @@ include = [
     "README.md",
     "LICENSE.txt",
 ]
-keywords = [ "datadog", "dogstatsd" ]
+keywords = [ "datadog", "dogstatsd", "statsd" ]
 
 [dependencies]
 rand = "^0.3"
