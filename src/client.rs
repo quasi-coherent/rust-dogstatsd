@@ -320,6 +320,12 @@ pub struct Pipeline {
     max_udp_size: usize,
 }
 
+impl Default for Pipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Pipeline {
     pub fn new() -> Pipeline {
         Pipeline {
@@ -624,7 +630,7 @@ mod test {
         let client = Client::new(&host, "myapp", None).unwrap();
         struct TimeTest {
             num: u8,
-        };
+        }
 
         let mut t = TimeTest { num: 10 };
         let output = client.time("time_block", &None, || {
@@ -728,7 +734,7 @@ mod test {
         pipeline.gauge("metric", 9.1);
         struct TimeTest {
             num: u8,
-        };
+        }
 
         let mut t = TimeTest { num: 10 };
         pipeline.time("time_block", || {
