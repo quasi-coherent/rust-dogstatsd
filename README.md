@@ -1,6 +1,7 @@
 # Rust DogStatsd
 
-[![Build Status](https://travis-ci.org/minato128/rust-dogstatsd.svg?branch=main)](https://travis-ci.org/minato128/rust-dogstatsd)
+[![CI](https://github.com/minato128/rust-dogstatsd/actions/workflows/ci.yml/badge.svg)](https://github.com/minato128/rust-dogstatsd/actions/workflows/ci.yml)
+[![Latest version](https://img.shields.io/crates/v/datadog-statsd.svg)](https://crates.io/crates/datadog-statsd)
 
 A DogStatsD client implementation of statsd in rust. 
 
@@ -21,7 +22,7 @@ Add the `datadog-statsd` package as a dependency in your `Cargo.toml` file:
 datadog-statsd = "^0.1.0"
 ```
 
-You need rustc >= 1.8.0 for statsd to work.
+You need rustc >= 1.31.0 for statsd to work.
 
 You can then get a client instance and start tracking metrics:
 
