@@ -1,6 +1,7 @@
 # Rust DogStatsd
 
 [![CI](https://github.com/minato128/rust-dogstatsd/actions/workflows/ci.yml/badge.svg)](https://github.com/minato128/rust-dogstatsd/actions/workflows/ci.yml)
+[![Latest version](https://img.shields.io/crates/v/datadog-statsd.svg)](https://crates.io/crates/datadog-statsd)
 
 A DogStatsD client implementation of statsd in rust. 
 
