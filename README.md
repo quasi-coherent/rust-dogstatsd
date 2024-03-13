@@ -19,7 +19,7 @@ Add the `datadog-statsd` package as a dependency in your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-datadog-statsd = "^0.1.0"
+datadog-statsd = "0.1.2"
 ```
 
 You need rustc >= 1.31.0 for statsd to work.
