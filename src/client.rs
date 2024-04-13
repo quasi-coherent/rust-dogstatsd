@@ -161,7 +161,7 @@ impl Client {
     ///
     /// This modifies a counter with an effective sampling
     /// rate of 1.0.
-    pub fn incr(&self, metric: &str, tags: Option<Vec<&str>>) {
+    pub fn incr(&self, metric: &str, tags: Option<&Vec<&str>>) {
         self.count(metric, 1.0, tags);
     }
 
@@ -174,7 +174,7 @@ impl Client {
     ///
     /// This modifies a counter with an effective sampling
     /// rate of 1.0.
-    pub fn decr(&self, metric: &str, tags: Option<Vec<&str>>) {
+    pub fn decr(&self, metric: &str, tags: Option<&Vec<&str>>) {
         self.count(metric, -1.0, tags);
     }
 
@@ -187,7 +187,7 @@ impl Client {
     /// // Increment by 12
     /// client.count("metric.completed", 12.0, tags);
     /// ```
-    pub fn count(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+    pub fn count(&self, metric: &str, value: f64, tags: Option<&Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
         self.send(data);
     }
@@ -202,7 +202,7 @@ impl Client {
     /// // Increment by 4 50% of the time.
     /// client.sampled_count("metric.completed", 4, 0.5, tags);
     /// ```
-    pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: Option<Vec<&str>>) {
+    pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: Option<&Vec<&str>>) {
         if rand::random::<f64>() >= rate {
             return;
         }
@@ -216,7 +216,7 @@ impl Client {
     /// // set a gauge to 9001
     /// client.gauge("power_level.observed", 9001.0, tags);
     /// ```
-    pub fn gauge(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+    pub fn gauge(&self, metric: &str, value: f64, tags: Option<&Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|g", metric, value), tags);
         self.send(data);
     }
@@ -229,7 +229,7 @@ impl Client {
     /// // pass a duration value
     /// client.timer("response.duration", 10.123, tags);
     /// ```
-    pub fn timer(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+    pub fn timer(&self, metric: &str, value: f64, tags: Option<&Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|ms", metric, value), tags);
         self.send(data);
     }
@@ -245,7 +245,7 @@ impl Client {
     ///   // Your code here.
     /// });
     /// ```
-    pub fn time<F, R>(&self, metric: &str, tags: Option<Vec<&str>>, callable: F) -> R
+    pub fn time<F, R>(&self, metric: &str, tags: Option<&Vec<&str>>, callable: F) -> R
     where
         F: FnOnce() -> R,
     {
@@ -260,7 +260,7 @@ impl Client {
     /// Time an async block of code.
     /// The passed future will be `await`ed on, timed, and the result returned, the time
     /// having passed being sent as a "time" metric.
-    pub async fn time_async<F, O>(&self, metric: &str, tags: Option<Vec<&str>>, f: F) -> O
+    pub async fn time_async<F, O>(&self, metric: &str, tags: Option<&Vec<&str>>, f: F) -> O
     where
         F: Future<Output = O>,
     {
@@ -280,11 +280,11 @@ impl Client {
         }
     }
 
-    fn prepare_with_tags<T: AsRef<str>>(&self, data: T, tags: Option<Vec<&str>>) -> String {
+    fn prepare_with_tags<T: AsRef<str>>(&self, data: T, tags: Option<&Vec<&str>>) -> String {
         self.append_tags(self.prepare(data), tags)
     }
 
-    fn append_tags<T: AsRef<str>>(&self, data: T, tags: Option<Vec<&str>>) -> String {
+    fn append_tags<T: AsRef<str>>(&self, data: T, tags: Option<&Vec<&str>>) -> String {
         if self.client.constant_tags.is_empty() && tags.is_none() {
             data.as_ref().to_string()
         } else {
@@ -330,7 +330,7 @@ impl Client {
     /// // pass response size value
     /// client.histogram("response.size", 128.0, tags);
     /// ```
-    pub fn histogram(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
+    pub fn histogram(&self, metric: &str, value: f64, tags: Option<&Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|h", metric, value), tags);
         self.send(data);
     }
@@ -341,7 +341,7 @@ impl Client {
     /// // pass a app start event
     /// client.event("MyApp Start", "MyApp Details", AlertType::Info, &Some(vec!["tag1", "tag2:test"]));
     /// ```
-    pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: Option<Vec<&str>>) {
+    pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: Option<&Vec<&str>>) {
         let mut d = vec![];
         d.push(format!("_e{{{},{}}}:{}", title.len(), text.len(), title));
         d.push(text.to_string());
@@ -362,7 +362,7 @@ impl Client {
         &self,
         service_check_name: &str,
         status: ServiceCheckStatus,
-        tags: Option<Vec<&str>>,
+        tags: Option<&Vec<&str>>,
     ) {
         let mut d = vec![];
         let status_code = (status as u32).to_string();
@@ -758,7 +758,7 @@ mod test {
         let mut response = server_recv(server.try_clone().unwrap());
         assert_eq!("myapp.metric:9.1|h", response);
         // with tags
-        client.histogram("metric", 9.1, Some(vec!["tag1", "tag2:test"]));
+        client.histogram("metric", 9.1, Some(&vec!["tag1", "tag2:test"]));
         response = server_recv(server.try_clone().unwrap());
         assert_eq!("myapp.metric:9.1|h|#tag1,tag2:test", response);
     }
@@ -775,14 +775,14 @@ mod test {
         assert_eq!("myapp.metric:9.1|h|#tag1common,tag2common:test", response);
         // with tags
         let tags = Some(vec!["tag1", "tag2:test"]);
-        client.histogram("metric", 9.1, tags.clone());
+        client.histogram("metric", 9.1, tags.as_ref());
         response = server_recv(server.try_clone().unwrap());
         assert_eq!(
             "myapp.metric:9.1|h|#tag1common,tag2common:test,tag1,tag2:test",
             response
         );
         // repeat
-        client.histogram("metric", 19.12, tags);
+        client.histogram("metric", 19.12, tags.as_ref());
         response = server_recv(server.try_clone().unwrap());
         assert_eq!(
             "myapp.metric:19.12|h|#tag1common,tag2common:test,tag1,tag2:test",
@@ -795,17 +795,25 @@ mod test {
         let host = next_test_ip4();
         let server = make_server(&host);
         let client = make_client(&host);
+        let tags = Some(vec!["tag1", "tag2:test"]);
 
-        client.event(
-            "Title Test",
-            "Text ABC",
-            AlertType::Error,
-            Some(vec!["tag1", "tag2:test"]),
-        );
+        client.event("Title Test", "Text ABC", AlertType::Error, tags.as_ref());
 
-        let response = server_recv(server);
+        let response = server_recv(server.try_clone().unwrap());
         assert_eq!(
             "_e{10,8}:Title Test|Text ABC|t:error|#tag1,tag2:test",
+            response
+        );
+
+        client.event(
+            "Title Test 2",
+            "Text ABCD",
+            AlertType::Warning,
+            tags.as_ref(),
+        );
+        let response = server_recv(server.try_clone().unwrap());
+        assert_eq!(
+            "_e{12,9}:Title Test 2|Text ABCD|t:warning|#tag1,tag2:test",
             response
         );
     }
@@ -819,7 +827,7 @@ mod test {
         client.service_check(
             "Service.check.name",
             ServiceCheckStatus::Critical,
-            Some(vec!["tag1", "tag2:test"]),
+            Some(&vec!["tag1", "tag2:test"]),
         );
 
         let response = server_recv(server);

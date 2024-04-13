@@ -1,13 +1,16 @@
 [package]
 name = "datadog-statsd"
-version = "0.1.2"
+version = "0.2.0"
 description = "A dogstatsd client for rust."
-homepage = "https://github.com/minato128/rust-dogstatsd"
-repository = "https://github.com/minato128/rust-dogstatsd"
-documentation = "https://docs.rs/datadog-statsd/"
+homepage = "https://github.com/quasi-coherent/rust-dogstatsd"
+repository = "https://github.com/quasi-coherent/rust-dogstatsd"
 readme = "README.md"
 license = "MIT"
-authors = ["Mark Story <mark@mark-story.com>"]
+authors = [
+        "Mark Story <mark@mark-story.com>",
+        "minato128 <https://github.com/minato128>",
+        "Daniel Donohue <d.michael.donohue@gmail.com>",
+]
 include = [
     "**/*.rs",
     "Cargo.toml",

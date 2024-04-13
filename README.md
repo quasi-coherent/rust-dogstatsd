@@ -3,15 +3,10 @@
 [![CI](https://github.com/minato128/rust-dogstatsd/actions/workflows/ci.yml/badge.svg)](https://github.com/minato128/rust-dogstatsd/actions/workflows/ci.yml)
 [![Latest version](https://img.shields.io/crates/v/datadog-statsd.svg)](https://crates.io/crates/datadog-statsd)
 
-A DogStatsD client implementation of statsd in rust. 
+A DogStatsD client implementation of statsd in Rust.
 
-- Forked from https://github.com/markstory/rust-statsd
-- Support Datadog Statsd extensions
-  - Events
-  - Service Checks
-  - Constant Tagging
-  - Tagging for a Specific Metric
-
+- Forked from https://github.com/minato128/rust-dogstatsd, which was forked from https://github.com/markstory/rust-statsd
+- Adds timing of async functions as well as makes the `Client` type `Clone`able
 
 ## Using the client library
 
@@ -19,7 +14,7 @@ Add the `datadog-statsd` package as a dependency in your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-datadog-statsd = "0.1.2"
+datadog-statsd = "0.2.0"
 ```
 
 You need rustc >= 1.31.0 for statsd to work.
@@ -27,15 +22,17 @@ You need rustc >= 1.31.0 for statsd to work.
 You can then get a client instance and start tracking metrics:
 
 ```rust
-// Load the crate
-extern crate datadog_statsd;
+// Import the client and config objects.
+use datadog_statsd::{Client, ClientConfig};
 
-// Import the client object.
-use datadog_statsd::Client;
+// Build a config with a prefix and some constant tags
+let config = ClientConfig::builder(("127.0.0.1", 8125))
+    .prefix("myapp")
+    .constant_tags(vec!["common1", "common2:test"])
+    .build();
 
-// Get a client with the prefix of `myapp`. The host should be the
-// IP:port of your statsd daemon.
-let client = Client::new("127.0.0.1:8125", "myapp", Some(vec!["common1", "common2:test"]),).unwrap();
+// Make a client from this config
+let client = Client::new(&config).unwrap();
 ```
 
 ## Tracking Metrics
@@ -43,49 +40,56 @@ let client = Client::new("127.0.0.1:8125", "myapp", Some(vec!["common1", "common
 Once you've created a client, you can track timers and metrics:
 
 ```rust
-let tags = &Some(vec!["tag1", "tag2:test"]);
+let tags = Some(vec!["tag1", "tag2:test"]);
 
 // Increment a counter by 1
-client.incr("some.counter", tags);
+client.incr("some.counter", tags.as_ref());
 
 // Decrement a counter by 1
-client.decr("some.counter", tags);
+client.decr("some.counter", tags.as_ref());
 
 // Update a gauge
-client.gauge("some.value", 12.0, tags);
+client.gauge("some.value", 12.0, tags.as_ref());
 
 // Modify a counter by an arbitrary float.
-client.count("some.counter", 511.0, tags);
+client.count("some.counter", 511.0, tags.as_ref());
 
 // Send a histogram value as a float.
-client.histogram("some.histogram", 511.0, tags);
+client.histogram("some.histogram", 511.0, tags.as_ref());
 ```
 
 ### Tracking Timers
 
-Timers can be updated using `timer()` and `time()`:
+Timers can be updated using `timer()`, `time()`, and `time_async()`:
 
 ```rust
 // Update a timer based on a calculation you've done.
-client.timer("operation.duration", 13.4, tags);
+client.timer("operation.duration", 13.4, tags.as_ref());
 
 // Time a closure
-client.time("operation.duration", tags, || {
+client.time("operation.duration", tags.as_ref(), || {
 	// Do something expensive.
 });
+
+// Time an async closure
+let result = client.time_async(
+    "operation.duration",
+    tags.as_ref(),
+    || something_async(),
+).await
 ```
 
 ### Events & ServiceChecks
 
 ```rust
 // Send a datadog event.
-client.event("event title", "event text", AlertType::Warning, tags);
+client.event("event title", "event text", AlertType::Warning, tags.as_ref());
 
 // Send a datadog service check.
 client.service_check(
     "myapp.service.check.name",
     ServiceCheckStatus::Critical,
-    tags,
+    tags.as_ref(),
 );
 ```
 
