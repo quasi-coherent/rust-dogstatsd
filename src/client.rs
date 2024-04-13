@@ -1,41 +1,100 @@
+use futures::Future;
+use rand;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::error;
 use std::fmt;
-use std::io::Error;
-use std::net::AddrParseError;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use std::sync::Arc;
 use std::time;
+use thiserror::Error;
 
-extern crate rand;
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum StatsdError {
-    IoError(Error),
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("{0}")]
     AddrParseError(String),
 }
 
-impl From<AddrParseError> for StatsdError {
-    fn from(_: AddrParseError) -> StatsdError {
-        StatsdError::AddrParseError("Address parsing error".to_string())
+/// A config to build a statsd Client.  The address field should implement `std::net::ToSocketAddrs`.
+/// See https://doc.rust-lang.org/std/net/trait.ToSocketAddrs.html.
+///
+/// This type admits a builder pattern that's used like this:
+///
+/// ```ignore
+/// use datadog_statsd::ClientConfig;
+///
+/// let config: ClientConfig =
+///     ClientConfig::builder(("127.0.0.1", 8125))
+///         .prefix("some.prefix")
+///         .constant_tags(vec!["tag1", "tag2"])
+///         .build();
+/// ...
+///
+/// ```
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ClientConfig<T> {
+    pub address: T,
+    pub prefix: Option<String>,
+    pub constant_tags: Option<Vec<String>>,
+}
+
+impl<T> ClientConfig<T> {
+    pub fn builder(address: T) -> ClientConfigBuilder<T> {
+        ClientConfigBuilder::new(address)
+    }
+
+    pub fn to_socket_addr(&self) -> Result<SocketAddr, StatsdError>
+    where
+        T: ToSocketAddrs,
+    {
+        self.address
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| StatsdError::AddrParseError("could not parse address".to_string()))
     }
 }
 
-impl From<Error> for StatsdError {
-    fn from(err: Error) -> StatsdError {
-        StatsdError::IoError(err)
-    }
+pub struct ClientConfigBuilder<T> {
+    address: T,
+    prefix: Option<String>,
+    constant_tags: Option<Vec<String>>,
 }
 
-impl fmt::Display for StatsdError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            StatsdError::IoError(ref e) => write!(f, "{}", e),
-            StatsdError::AddrParseError(ref e) => write!(f, "{}", e),
+impl<T> ClientConfigBuilder<T> {
+    pub fn new(address: T) -> Self {
+        Self {
+            address,
+            prefix: None,
+            constant_tags: None,
+        }
+    }
+
+    pub fn prefix(mut self, prefix: &str) -> Self {
+        self.prefix = Some(prefix.into());
+        self
+    }
+
+    pub fn constant_tags(mut self, constant_tags: Vec<&str>) -> Self {
+        self.constant_tags = Some(constant_tags.iter().map(|t| t.to_string()).collect());
+        self
+    }
+
+    pub fn build(self) -> ClientConfig<T> {
+        ClientConfig {
+            address: self.address,
+            prefix: self.prefix,
+            constant_tags: self.constant_tags,
         }
     }
 }
 
-impl error::Error for StatsdError {}
+struct InternalClient {
+    socket: UdpSocket,
+    socket_addr: SocketAddr,
+    prefix: String,
+    constant_tags: Vec<String>,
+}
 
 /// Client socket for statsd servers.
 ///
@@ -53,39 +112,43 @@ impl error::Error for StatsdError {}
 /// client.incr("some.metric.completed");
 /// ```
 pub struct Client {
-    socket: UdpSocket,
-    server_address: SocketAddr,
-    prefix: String,
-    constant_tags: Vec<String>,
+    client: Arc<InternalClient>,
+}
+
+impl Clone for Client {
+    fn clone(&self) -> Self {
+        Self {
+            client: Arc::clone(&self.client),
+        }
+    }
 }
 
 impl Client {
-    /// Construct a new statsd client given an host/port & prefix
-    pub fn new<T: ToSocketAddrs>(
-        host: T,
-        prefix: &str,
-        constant_tags: Option<Vec<&str>>,
-    ) -> Result<Client, StatsdError> {
-        let server_address = host
-            .to_socket_addrs()?
-            .next()
-            .ok_or_else(|| StatsdError::AddrParseError("Address parsing error".to_string()))?;
+    /// Construct a new statsd client given a client config
+    pub fn new<T: ToSocketAddrs>(client_config: &ClientConfig<T>) -> Result<Client, StatsdError> {
+        let socket_addr = client_config.to_socket_addr()?;
 
         // Bind to a generic port as we'll only be writing on this
         // socket.
-        let socket = if server_address.is_ipv4() {
+        let socket = if socket_addr.is_ipv4() {
             UdpSocket::bind("0.0.0.0:0")?
         } else {
             UdpSocket::bind("[::]:0")?
         };
-        Ok(Client {
+        let internal_client = InternalClient {
             socket,
-            prefix: prefix.to_string(),
-            server_address,
-            constant_tags: match constant_tags {
+            socket_addr,
+            prefix: match &client_config.prefix {
+                Some(prefix) => prefix.to_string(),
+                _ => "".into(),
+            },
+            constant_tags: match &client_config.constant_tags {
                 Some(tags) => tags.iter().map(|x| x.to_string()).collect(),
                 None => vec![],
             },
+        };
+        Ok(Client {
+            client: Arc::new(internal_client),
         })
     }
 
@@ -98,7 +161,7 @@ impl Client {
     ///
     /// This modifies a counter with an effective sampling
     /// rate of 1.0.
-    pub fn incr(&self, metric: &str, tags: &Option<Vec<&str>>) {
+    pub fn incr(&self, metric: &str, tags: Option<Vec<&str>>) {
         self.count(metric, 1.0, tags);
     }
 
@@ -111,7 +174,7 @@ impl Client {
     ///
     /// This modifies a counter with an effective sampling
     /// rate of 1.0.
-    pub fn decr(&self, metric: &str, tags: &Option<Vec<&str>>) {
+    pub fn decr(&self, metric: &str, tags: Option<Vec<&str>>) {
         self.count(metric, -1.0, tags);
     }
 
@@ -124,7 +187,7 @@ impl Client {
     /// // Increment by 12
     /// client.count("metric.completed", 12.0, tags);
     /// ```
-    pub fn count(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
+    pub fn count(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|c", metric, value), tags);
         self.send(data);
     }
@@ -139,7 +202,7 @@ impl Client {
     /// // Increment by 4 50% of the time.
     /// client.sampled_count("metric.completed", 4, 0.5, tags);
     /// ```
-    pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: &Option<Vec<&str>>) {
+    pub fn sampled_count(&self, metric: &str, value: f64, rate: f64, tags: Option<Vec<&str>>) {
         if rand::random::<f64>() >= rate {
             return;
         }
@@ -153,7 +216,7 @@ impl Client {
     /// // set a gauge to 9001
     /// client.gauge("power_level.observed", 9001.0, tags);
     /// ```
-    pub fn gauge(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
+    pub fn gauge(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|g", metric, value), tags);
         self.send(data);
     }
@@ -166,7 +229,7 @@ impl Client {
     /// // pass a duration value
     /// client.timer("response.duration", 10.123, tags);
     /// ```
-    pub fn timer(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
+    pub fn timer(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|ms", metric, value), tags);
         self.send(data);
     }
@@ -182,7 +245,7 @@ impl Client {
     ///   // Your code here.
     /// });
     /// ```
-    pub fn time<F, R>(&self, metric: &str, tags: &Option<Vec<&str>>, callable: F) -> R
+    pub fn time<F, R>(&self, metric: &str, tags: Option<Vec<&str>>, callable: F) -> R
     where
         F: FnOnce() -> R,
     {
@@ -194,23 +257,38 @@ impl Client {
         return_val
     }
 
+    /// Time an async block of code.
+    /// The passed future will be `await`ed on, timed, and the result returned, the time
+    /// having passed being sent as a "time" metric.
+    pub async fn time_async<F, O>(&self, metric: &str, tags: Option<Vec<&str>>, f: F) -> O
+    where
+        F: Future<Output = O>,
+    {
+        let start = time::Instant::now();
+        let return_val = f.await;
+        let used = start.elapsed();
+        let data = self.prepare_with_tags(format!("{}:{}|ms", metric, used.as_millis()), tags);
+        self.send(data);
+        return_val
+    }
+
     fn prepare<T: AsRef<str>>(&self, data: T) -> String {
-        if self.prefix.is_empty() {
+        if self.client.prefix.is_empty() {
             data.as_ref().to_string()
         } else {
-            format!("{}.{}", self.prefix, data.as_ref())
+            format!("{}.{}", self.client.prefix, data.as_ref())
         }
     }
 
-    fn prepare_with_tags<T: AsRef<str>>(&self, data: T, tags: &Option<Vec<&str>>) -> String {
+    fn prepare_with_tags<T: AsRef<str>>(&self, data: T, tags: Option<Vec<&str>>) -> String {
         self.append_tags(self.prepare(data), tags)
     }
 
-    fn append_tags<T: AsRef<str>>(&self, data: T, tags: &Option<Vec<&str>>) -> String {
-        if self.constant_tags.is_empty() && tags.is_none() {
+    fn append_tags<T: AsRef<str>>(&self, data: T, tags: Option<Vec<&str>>) -> String {
+        if self.client.constant_tags.is_empty() && tags.is_none() {
             data.as_ref().to_string()
         } else {
-            let mut all_tags = self.constant_tags.clone();
+            let mut all_tags = self.client.constant_tags.clone();
             match tags {
                 Some(v) => {
                     for tag in v {
@@ -227,7 +305,10 @@ impl Client {
 
     /// Send data along the UDP socket.
     fn send(&self, data: String) {
-        let _ = self.socket.send_to(data.as_bytes(), self.server_address);
+        let _ = self
+            .client
+            .socket
+            .send_to(data.as_bytes(), self.client.socket_addr);
     }
 
     /// Get a pipeline struct that allows optimizes the number of UDP
@@ -249,7 +330,7 @@ impl Client {
     /// // pass response size value
     /// client.histogram("response.size", 128.0, tags);
     /// ```
-    pub fn histogram(&self, metric: &str, value: f64, tags: &Option<Vec<&str>>) {
+    pub fn histogram(&self, metric: &str, value: f64, tags: Option<Vec<&str>>) {
         let data = self.prepare_with_tags(format!("{}:{}|h", metric, value), tags);
         self.send(data);
     }
@@ -260,7 +341,7 @@ impl Client {
     /// // pass a app start event
     /// client.event("MyApp Start", "MyApp Details", AlertType::Info, &Some(vec!["tag1", "tag2:test"]));
     /// ```
-    pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: &Option<Vec<&str>>) {
+    pub fn event(&self, title: &str, text: &str, alert_type: AlertType, tags: Option<Vec<&str>>) {
         let mut d = vec![];
         d.push(format!("_e{{{},{}}}:{}", title.len(), text.len(), title));
         d.push(text.to_string());
@@ -281,7 +362,7 @@ impl Client {
         &self,
         service_check_name: &str,
         status: ServiceCheckStatus,
-        tags: &Option<Vec<&str>>,
+        tags: Option<Vec<&str>>,
     ) {
         let mut d = vec![];
         let status_code = (status as u32).to_string();
@@ -534,6 +615,12 @@ mod test {
         UdpSocket::bind(host).ok().unwrap()
     }
 
+    // Makes a `Client`.
+    fn make_client(host: &str) -> Client {
+        let config = ClientConfig::builder(host).build();
+        Client::new(&config).unwrap()
+    }
+
     fn server_recv(server: UdpSocket) -> String {
         let (serv_tx, serv_rx) = sync_channel(1);
         let _t = thread::spawn(move || {
@@ -555,9 +642,9 @@ mod test {
     fn test_sending_gauge() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
-        client.gauge("metric", 9.1, &None);
+        client.gauge("metric", 9.1, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:9.1|g", response);
@@ -567,9 +654,9 @@ mod test {
     fn test_sending_gauge_without_prefix() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "", None).unwrap();
+        let client = make_client(&host);
 
-        client.gauge("metric", 9.1, &None);
+        client.gauge("metric", 9.1, None);
 
         let response = server_recv(server);
         assert_eq!("metric:9.1|g", response);
@@ -579,9 +666,9 @@ mod test {
     fn test_sending_incr() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
-        client.incr("metric", &None);
+        client.incr("metric", None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:1|c", response);
@@ -591,9 +678,9 @@ mod test {
     fn test_sending_decr() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
-        client.decr("metric", &None);
+        client.decr("metric", None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:-1|c", response);
@@ -603,9 +690,9 @@ mod test {
     fn test_sending_count() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
-        client.count("metric", 12.2, &None);
+        client.count("metric", 12.2, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:12.2|c", response);
@@ -615,9 +702,9 @@ mod test {
     fn test_sending_timer() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
-        client.timer("metric", 21.39, &None);
+        client.timer("metric", 21.39, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.metric:21.39|ms", response);
@@ -627,13 +714,13 @@ mod test {
     fn test_sending_timed_block() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         struct TimeTest {
             num: u8,
         }
 
         let mut t = TimeTest { num: 10 };
-        let output = client.time("time_block", &None, || {
+        let output = client.time("time_block", None, || {
             t.num += 2;
             "a string"
         });
@@ -649,14 +736,14 @@ mod test {
     fn test_sending_histogram() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
         // without tags
-        client.histogram("metric", 9.1, &None);
+        client.histogram("metric", 9.1, None);
         let mut response = server_recv(server.try_clone().unwrap());
         assert_eq!("myapp.metric:9.1|h", response);
         // with tags
-        client.histogram("metric", 9.1, &Some(vec!["tag1", "tag2:test"]));
+        client.histogram("metric", 9.1, Some(vec!["tag1", "tag2:test"]));
         response = server_recv(server.try_clone().unwrap());
         assert_eq!("myapp.metric:9.1|h|#tag1,tag2:test", response);
     }
@@ -665,16 +752,15 @@ mod test {
     fn test_sending_histogram_with_constant_tags() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client =
-            Client::new(&host, "myapp", Some(vec!["tag1common", "tag2common:test"])).unwrap();
+        let client = make_client(&host);
 
         // without tags
-        client.histogram("metric", 9.1, &None);
+        client.histogram("metric", 9.1, None);
         let mut response = server_recv(server.try_clone().unwrap());
         assert_eq!("myapp.metric:9.1|h|#tag1common,tag2common:test", response);
         // with tags
-        let tags = &Some(vec!["tag1", "tag2:test"]);
-        client.histogram("metric", 9.1, tags);
+        let tags = Some(vec!["tag1", "tag2:test"]);
+        client.histogram("metric", 9.1, tags.clone());
         response = server_recv(server.try_clone().unwrap());
         assert_eq!(
             "myapp.metric:9.1|h|#tag1common,tag2common:test,tag1,tag2:test",
@@ -693,13 +779,13 @@ mod test {
     fn test_sending_event_with_tags() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
         client.event(
             "Title Test",
             "Text ABC",
             AlertType::Error,
-            &Some(vec!["tag1", "tag2:test"]),
+            Some(vec!["tag1", "tag2:test"]),
         );
 
         let response = server_recv(server);
@@ -713,12 +799,12 @@ mod test {
     fn test_sending_service_check_with_tags() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
 
         client.service_check(
             "Service.check.name",
             ServiceCheckStatus::Critical,
-            &Some(vec!["tag1", "tag2:test"]),
+            Some(vec!["tag1", "tag2:test"]),
         );
 
         let response = server_recv(server);
@@ -729,7 +815,7 @@ mod test {
     fn test_pipeline_sending_time_block() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         let mut pipeline = client.pipeline();
         pipeline.gauge("metric", 9.1);
         struct TimeTest {
@@ -751,7 +837,7 @@ mod test {
     fn test_pipeline_sending_gauge() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         let mut pipeline = client.pipeline();
         pipeline.gauge("metric", 9.1);
         pipeline.send(&client);
@@ -764,7 +850,7 @@ mod test {
     fn test_pipeline_sending_histogram() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         let mut pipeline = client.pipeline();
         pipeline.histogram("metric", 9.1);
         pipeline.send(&client);
@@ -777,7 +863,7 @@ mod test {
     fn test_pipeline_sending_multiple_data() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         let mut pipeline = client.pipeline();
         pipeline.gauge("metric", 9.1);
         pipeline.count("metric", 12.2);
@@ -791,7 +877,7 @@ mod test {
     fn test_pipeline_set_max_udp_size() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         let mut pipeline = client.pipeline();
         pipeline.set_max_udp_size(20);
         pipeline.gauge("metric", 9.1);
@@ -806,7 +892,7 @@ mod test {
     fn test_pipeline_send_metric_after_pipeline() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = Client::new(&host, "myapp", None).unwrap();
+        let client = make_client(&host);
         let mut pipeline = client.pipeline();
 
         pipeline.gauge("load", 9.0);
@@ -815,7 +901,7 @@ mod test {
 
         // Should still be able to send metrics
         // with the client.
-        client.count("customers", 6.0, &None);
+        client.count("customers", 6.0, None);
 
         let response = server_recv(server);
         assert_eq!("myapp.load:9|g\nmyapp.customers:7|c", response);
