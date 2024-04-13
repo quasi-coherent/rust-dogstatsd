@@ -8,4 +8,4 @@
 //! this.
 //!
 pub mod client;
-pub use client::{Client, ClientConfig};
+pub use client::{Client, ClientConfig, StatsdError};
