@@ -99,16 +99,21 @@ struct InternalClient {
 /// Client socket for statsd servers.
 ///
 /// After creating a metric you can use `Client`
-/// to send metrics to the configured statsd server
+/// to send metrics to the configured statsd server.
 ///
 /// # Example
 ///
 /// Creating a client and sending metrics is easy.
 ///
 /// ```ignore
-/// use datadog_statsd::client::Client;
+/// use datadog_statsd::{Client, ClientConfig};
 ///
-/// let client = Client::new("127.0.0.1:8125", "myapp", tags);
+/// let config = ClientConfig::builder(("127.0.0.1", 8125))
+///     .prefix("myapp")
+///     .constant_tags(vec!["sometag", "some:othertag"])
+///     .build();
+///
+/// let client = Client::new(&config);
 /// client.incr("some.metric.completed");
 /// ```
 pub struct Client {
