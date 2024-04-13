@@ -615,9 +615,24 @@ mod test {
         UdpSocket::bind(host).ok().unwrap()
     }
 
-    // Makes a `Client`.
+    // Makes a `Client` with a prefix.
     fn make_client(host: &str) -> Client {
+        let config = ClientConfig::builder(host).prefix("myapp").build();
+        Client::new(&config).unwrap()
+    }
+
+    // Makes a `Client` with no prefix.
+    fn make_client_without_prefix(host: &str) -> Client {
         let config = ClientConfig::builder(host).build();
+        Client::new(&config).unwrap()
+    }
+
+    // Makes a client with prefix and constant tags.
+    fn make_client_with_prefix_and_constant_tags(host: &str) -> Client {
+        let config = ClientConfig::builder(host)
+            .prefix("myapp")
+            .constant_tags(vec!["tag1common", "tag2common:test"])
+            .build();
         Client::new(&config).unwrap()
     }
 
@@ -654,7 +669,7 @@ mod test {
     fn test_sending_gauge_without_prefix() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = make_client(&host);
+        let client = make_client_without_prefix(&host);
 
         client.gauge("metric", 9.1, None);
 
@@ -749,10 +764,10 @@ mod test {
     }
 
     #[test]
-    fn test_sending_histogram_with_constant_tags() {
+    fn test_sending_histogram_with_prefix_and_constant_tags() {
         let host = next_test_ip4();
         let server = make_server(&host);
-        let client = make_client(&host);
+        let client = make_client_with_prefix_and_constant_tags(&host);
 
         // without tags
         client.histogram("metric", 9.1, None);
